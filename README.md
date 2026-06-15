@@ -1,11 +1,11 @@
 # sc-code-review
 
-AI-powered security analysis CLI that combines three SAST tools (Semgrep, Bearer, Trivy) with Claude AI to produce a comprehensive, prioritized security report for any codebase.
+AI-powered security analysis CLI that combines three SAST tools (Semgrep, Bearer, Trivy) with your choice of AI model to produce a comprehensive, prioritized security report for any codebase.
 
 ## Requirements
 
 - [Bun](https://bun.sh) v1.0 or later
-- An [Anthropic API key](https://console.anthropic.com/settings/keys)
+- An API key for one of the supported AI providers (see below)
 
 ## Installation
 
@@ -18,7 +18,7 @@ curl -fsSL https://bun.sh/install | bash
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/your-username/sc-code-review.git
+git clone https://github.com/sridhar-s-subramanian/sc-code-review.git
 cd sc-code-review
 bun install
 ```
@@ -39,10 +39,20 @@ sc-code-review init
 
 The setup wizard will:
 
-1. **Choose your AI provider** — Anthropic (Claude) is supported now; more providers coming soon
-2. **Choose a model** — Opus (most capable), Sonnet (balanced), or Haiku (fastest)
-3. **Enter your Anthropic API key** — stored securely at `~/.sc-code-review/config.json` (mode `600`)
+1. **Choose your AI provider** — Anthropic, OpenAI, or Google Gemini
+2. **Choose a model** — see the provider table below
+3. **Enter your API key** — stored securely at `~/.sc-code-review/config.json` (mode `600`)
 4. **Install SAST tools** — Semgrep, Bearer CLI, and Trivy are installed automatically if missing (via Homebrew on macOS or install scripts on Linux)
+
+## AI Providers
+
+| Provider | Models | Key prefix | Get key |
+|---|---|---|---|
+| **Anthropic** | Claude Opus 4.8, Sonnet 4.6, Haiku 4.5 | `sk-ant-` | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| **OpenAI** | GPT-4o, GPT-4o mini, o4-mini | `sk-` | [platform.openai.com](https://platform.openai.com/api-keys) |
+| **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash | — | [aistudio.google.com](https://aistudio.google.com/apikey) |
+
+You can switch provider or model at any time by re-running `sc-code-review init`.
 
 ## Usage
 
@@ -112,7 +122,7 @@ This outputs a single `sc-code-review` executable you can copy to `/usr/local/bi
 
 ## Re-configuring
 
-To change your model, API key, or reinstall tools at any time:
+To change your provider, model, API key, or reinstall tools at any time:
 
 ```bash
 sc-code-review init
