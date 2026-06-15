@@ -2,6 +2,8 @@ import { createInterface } from "node:readline";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
+
+const XAI_BASE_URL = "https://api.x.ai/v1";
 import { saveConfig } from "./config.ts";
 import { c, bold, dim, printSuccess, printWarning, printError } from "./reporter/terminal.ts";
 import type { AiProvider, Config, ToolName } from "./types.ts";
@@ -76,6 +78,22 @@ const PROVIDERS: ProviderOption[] = [
     models: [
       { id: "gemini-2.5-pro",   label: "Gemini 2.5 Pro",   description: "Most capable Gemini — advanced reasoning",    price: "$1.25 / 1M tokens" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Fast & cost-efficient — large-scale analysis", price: "$0.30 / 1M tokens" },
+    ],
+  },
+  {
+    id: "xai",
+    label: "xAI Grok",
+    tagline: "Grok 3 models with real-time knowledge",
+    keyConfig: {
+      envVar: "XAI_API_KEY",
+      keyUrl: "https://console.x.ai/",
+      label: "xAI API key",
+      prefix: "xai-",
+    },
+    models: [
+      { id: "grok-3",      label: "Grok 3",       description: "Most capable — deepest analysis",       price: "$3 / 1M tokens" },
+      { id: "grok-3-fast", label: "Grok 3 Fast",  description: "Higher throughput, same quality",       price: "$5 / 1M tokens" },
+      { id: "grok-3-mini", label: "Grok 3 Mini",  description: "Fast & lightweight reasoning model",    price: "$0.30 / 1M tokens" },
     ],
   },
 ];
@@ -196,13 +214,16 @@ async function verifyApiKey(provider: AiProvider, apiKey: string): Promise<boole
     } else if (provider === "openai") {
       const client = new OpenAI({ apiKey });
       await client.models.list();
-    } else {
+    } else if (provider === "google") {
       const client = new GoogleGenAI({ apiKey });
       await client.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: "hi" }] }],
         config: { maxOutputTokens: 1 },
       });
+    } else {
+      const client = new OpenAI({ apiKey, baseURL: XAI_BASE_URL });
+      await client.models.list();
     }
     return true;
   } catch {

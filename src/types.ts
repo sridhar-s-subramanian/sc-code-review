@@ -1,7 +1,7 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type ToolName = "semgrep" | "bearer" | "trivy";
 export type OutputFormat = "html" | "json" | "both";
-export type AiProvider = "anthropic" | "openai" | "google";
+export type AiProvider = "anthropic" | "openai" | "google" | "xai";
 
 export interface Finding {
   tool: ToolName;

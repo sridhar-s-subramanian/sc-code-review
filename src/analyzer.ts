@@ -1,6 +1,7 @@
 import { streamText as streamAnthropic } from "./providers/anthropic.ts";
 import { streamText as streamOpenAI }    from "./providers/openai.ts";
 import { streamText as streamGoogle }    from "./providers/google.ts";
+import { streamText as streamGrok }      from "./providers/grok.ts";
 import type { AiAnalysis, Config, Finding, ScanResult } from "./types.ts";
 
 const SYSTEM_PROMPT = `You are an expert application security engineer. You have received findings from multiple automated SAST tools and must synthesize them into a concise, actionable security report.
@@ -95,8 +96,10 @@ export async function analyze(
     fullText = await streamAnthropic(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
   } else if (config.provider === "openai") {
     fullText = await streamOpenAI(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
-  } else {
+  } else if (config.provider === "google") {
     fullText = await streamGoogle(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
+  } else {
+    fullText = await streamGrok(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
   }
 
   return parseResponse(fullText);

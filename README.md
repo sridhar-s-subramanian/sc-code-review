@@ -51,6 +51,7 @@ The setup wizard will:
 | **Anthropic** | Claude Opus 4.8, Sonnet 4.6, Haiku 4.5 | `sk-ant-` | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 | **OpenAI** | GPT-4o, GPT-4o mini, o4-mini | `sk-` | [platform.openai.com](https://platform.openai.com/api-keys) |
 | **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash | — | [aistudio.google.com](https://aistudio.google.com/apikey) |
+| **xAI Grok** | Grok 3, Grok 3 Fast, Grok 3 Mini | `xai-` | [console.x.ai](https://console.x.ai/) |
 
 You can switch provider or model at any time by re-running `sc-code-review init`.
 
