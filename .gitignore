@@ -1,0 +1,47 @@
+# dependencies
+node_modules
+
+# build output
+out
+dist
+*.tgz
+
+# compiled binary
+sc-code-review
+
+# generated reports
+sc-code-review-report-*.html
+sc-code-review-report-*.json
+
+# submission assets (screenshots + PDF generation)
+screenshots/
+scripts/
+*.pdf
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# environment variables
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IDE
+.idea
+.cursor
+
+# macOS
+.DS_Store

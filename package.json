@@ -1,0 +1,26 @@
+{
+  "name": "sc-code-review",
+  "version": "1.0.0",
+  "description": "AI-powered SAST security analysis CLI",
+  "module": "src/cli.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "sc-code-review": "./src/cli.ts"
+  },
+  "scripts": {
+    "cli": "bun src/cli.ts",
+    "build": "bun build --compile --minify src/cli.ts --outfile sc-code-review",
+    "link": "bun link"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "puppeteer": "^25.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
