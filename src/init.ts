@@ -1,17 +1,25 @@
 import { createInterface } from "node:readline";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { saveConfig } from "./config.ts";
 import { c, bold, dim, printSuccess, printWarning, printError } from "./reporter/terminal.ts";
 import type { AiProvider, Config, ToolName } from "./types.ts";
 
-// ── Provider / model catalogue (extend here to add new providers) ─────────────
+// ── Provider / model catalogue ────────────────────────────────────────────────
 
 interface ModelOption {
   id: string;
   label: string;
   description: string;
   price: string;
-  supportsThinking: boolean;
+}
+
+interface ProviderKeyConfig {
+  envVar: string;
+  keyUrl: string;
+  label: string;
+  prefix: string | null;
 }
 
 interface ProviderOption {
@@ -19,6 +27,7 @@ interface ProviderOption {
   label: string;
   tagline: string;
   models: ModelOption[];
+  keyConfig: ProviderKeyConfig;
 }
 
 const PROVIDERS: ProviderOption[] = [
@@ -26,31 +35,49 @@ const PROVIDERS: ProviderOption[] = [
     id: "anthropic",
     label: "Anthropic",
     tagline: "Claude models — industry-leading reasoning & code analysis",
+    keyConfig: {
+      envVar: "ANTHROPIC_API_KEY",
+      keyUrl: "https://console.anthropic.com/settings/keys",
+      label: "Anthropic API key",
+      prefix: "sk-ant-",
+    },
     models: [
-      {
-        id: "claude-opus-4-8",
-        label: "Claude Opus 4.8",
-        description: "Most capable — deepest analysis, best findings",
-        price: "$5 / 1M tokens",
-        supportsThinking: true,
-      },
-      {
-        id: "claude-sonnet-4-6",
-        label: "Claude Sonnet 4.6",
-        description: "Balanced — great quality at 3× lower cost",
-        price: "$3 / 1M tokens",
-        supportsThinking: true,
-      },
-      {
-        id: "claude-haiku-4-5",
-        label: "Claude Haiku 4.5",
-        description: "Fastest — lightweight scans & quick feedback",
-        price: "$1 / 1M tokens",
-        supportsThinking: false,
-      },
+      { id: "claude-opus-4-8",  label: "Claude Opus 4.8",  description: "Most capable — deepest analysis, best findings",  price: "$5 / 1M tokens" },
+      { id: "claude-sonnet-4-6",label: "Claude Sonnet 4.6",description: "Balanced — great quality at 3× lower cost",        price: "$3 / 1M tokens" },
+      { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", description: "Fastest — lightweight scans & quick feedback",      price: "$1 / 1M tokens" },
     ],
   },
-  // Future: { id: "openai", label: "OpenAI", ... }
+  {
+    id: "openai",
+    label: "OpenAI",
+    tagline: "GPT-4o and o-series reasoning models",
+    keyConfig: {
+      envVar: "OPENAI_API_KEY",
+      keyUrl: "https://platform.openai.com/api-keys",
+      label: "OpenAI API key",
+      prefix: "sk-",
+    },
+    models: [
+      { id: "gpt-4o",      label: "GPT-4o",      description: "Most capable GPT — best for complex security analysis", price: "$2.50 / 1M tokens" },
+      { id: "gpt-4o-mini", label: "GPT-4o mini", description: "Fast & affordable — great for smaller codebases",       price: "$0.15 / 1M tokens" },
+      { id: "o4-mini",     label: "o4-mini",      description: "Reasoning model — deep analysis with chain of thought", price: "$1.10 / 1M tokens" },
+    ],
+  },
+  {
+    id: "google",
+    label: "Google Gemini",
+    tagline: "Gemini 2.5 models with 1M context window",
+    keyConfig: {
+      envVar: "GEMINI_API_KEY",
+      keyUrl: "https://aistudio.google.com/apikey",
+      label: "Gemini API key",
+      prefix: null,
+    },
+    models: [
+      { id: "gemini-2.5-pro",   label: "Gemini 2.5 Pro",   description: "Most capable Gemini — advanced reasoning",    price: "$1.25 / 1M tokens" },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Fast & cost-efficient — large-scale analysis", price: "$0.30 / 1M tokens" },
+    ],
+  },
 ];
 
 // ── Interactive helpers ───────────────────────────────────────────────────────
@@ -66,7 +93,6 @@ function ask(question: string): Promise<string> {
 async function askSecret(label: string): Promise<string> {
   process.stdout.write(label);
 
-  // Temporarily override readline's output to mask characters as *
   type RlInternal = { stdoutMuted: boolean; _writeToOutput(s: string): void };
   const internal = rl as unknown as RlInternal;
   internal.stdoutMuted = true;
@@ -95,9 +121,9 @@ async function selectFromMenu<T>(
 ): Promise<T> {
   const pad = String(items.length).length;
   items.forEach((item, i) => {
-    const num  = c("#58a6ff", `  ${String(i + 1).padStart(pad)}.`);
-    const lbl  = bold(item.label.padEnd(24));
-    const meta = dim(item.meta);
+    const num    = c("#58a6ff", `  ${String(i + 1).padStart(pad)}.`);
+    const lbl    = bold(item.label.padEnd(24));
+    const meta   = dim(item.meta);
     const marker = i === defaultIdx ? c("#3fb950", " ◀ default") : "";
     console.log(`${num} ${lbl} ${meta}${marker}`);
   });
@@ -156,6 +182,34 @@ async function installTool(plan: InstallPlan): Promise<boolean> {
   return (await proc.exited) === 0;
 }
 
+// ── API key verification ──────────────────────────────────────────────────────
+
+async function verifyApiKey(provider: AiProvider, apiKey: string): Promise<boolean> {
+  try {
+    if (provider === "anthropic") {
+      const client = new Anthropic({ apiKey });
+      await client.messages.create({
+        model: "claude-haiku-4-5",
+        max_tokens: 1,
+        messages: [{ role: "user", content: "hi" }],
+      });
+    } else if (provider === "openai") {
+      const client = new OpenAI({ apiKey });
+      await client.models.list();
+    } else {
+      const client = new GoogleGenAI({ apiKey });
+      await client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: "hi" }] }],
+        config: { maxOutputTokens: 1 },
+      });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Separator helper ──────────────────────────────────────────────────────────
 
 function section(title: string, step: string): void {
@@ -168,17 +222,17 @@ function section(title: string, step: string): void {
 
 export async function runInit(): Promise<void> {
   console.clear();
-  console.log(`\n${bold("  Careem Security Review")}`);
+  console.log(`\n${bold("  sc-code-review")}`);
   console.log(`  ${dim("AI-powered SAST analysis — first-time setup")}\n`);
 
   // ── Step 1: AI provider ───────────────────────────────────────────────────
   section("AI Provider", "1/3");
 
-  const provider = await selectFromMenu(
+  const providerId = await selectFromMenu(
     PROVIDERS.map((p) => ({ label: p.label, meta: p.tagline, value: p.id })),
   );
 
-  const providerDef = PROVIDERS.find((p) => p.id === provider)!;
+  const providerDef = PROVIDERS.find((p) => p.id === providerId)!;
 
   // ── Step 2: Model ─────────────────────────────────────────────────────────
   section("Model", "2/3");
@@ -194,32 +248,33 @@ export async function runInit(): Promise<void> {
   // ── Step 3: API key ───────────────────────────────────────────────────────
   section("API Key", "3/3");
 
-  const envKey = process.env["ANTHROPIC_API_KEY"] ?? "";
+  const { envVar, keyUrl, label: keyLabel, prefix } = providerDef.keyConfig;
+  const envKey = process.env[envVar] ?? "";
   let apiKey: string;
 
-  if (envKey && envKey.startsWith("sk-ant-")) {
+  if (envKey && (!prefix || envKey.startsWith(prefix))) {
     const masked = `${envKey.slice(0, 14)}${"•".repeat(18)}`;
     const use = await ask(`Found key in environment (${masked}). Use it? [Y/n] `);
     apiKey = use.toLowerCase() === "n"
-      ? await askSecret("Anthropic API key: ")
+      ? await askSecret(`${keyLabel}: `)
       : envKey;
   } else {
-    console.log(`${dim("Get your key at")} ${c("#58a6ff", "https://console.anthropic.com/settings/keys")}\n`);
-    apiKey = await askSecret("Anthropic API key: ");
+    console.log(`${dim("Get your key at")} ${c("#58a6ff", keyUrl)}\n`);
+    apiKey = await askSecret(`${keyLabel}: `);
   }
 
-  if (!apiKey.startsWith("sk-ant-")) {
+  if (prefix && !apiKey.startsWith(prefix)) {
     console.log();
-    printError("Key must start with sk-ant-. Aborting.");
+    printError(`Key must start with ${prefix}. Aborting.`);
     rl.close();
     process.exit(1);
   }
 
   process.stdout.write(`\n${c("#58a6ff", "→")} Verifying key…`);
-  const valid = await verifyKey(apiKey);
+  const valid = await verifyApiKey(providerId, apiKey);
   if (!valid) {
     process.stdout.write(` ${c("#f85149", "failed")}\n`);
-    printError("Key is invalid or Anthropic API is unreachable.");
+    printError("Key is invalid or the API is unreachable.");
     rl.close();
     process.exit(1);
   }
@@ -267,7 +322,7 @@ export async function runInit(): Promise<void> {
   // ── Save ──────────────────────────────────────────────────────────────────
   rl.close();
 
-  await saveConfig({ provider, model, anthropicApiKey: apiKey, tools: toolAvailability });
+  await saveConfig({ provider: providerId, model, apiKey, tools: toolAvailability });
 
   const installed = toolNames.filter((t) => toolAvailability[t]);
 
@@ -278,18 +333,4 @@ export async function runInit(): Promise<void> {
   console.log(`  Tools     ${installed.length ? installed.join(", ") : dim("none — install later")}`);
   console.log(`  Config    ${dim("~/.sc-code-review/config.json")} ${dim("(mode 600)")}`);
   console.log(`\n  ${dim("Run:")} ${c("#3fb950", "sc-code-review scan <directory>")}\n`);
-}
-
-async function verifyKey(apiKey: string): Promise<boolean> {
-  try {
-    const client = new Anthropic({ apiKey });
-    await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 1,
-      messages: [{ role: "user", content: "hi" }],
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }

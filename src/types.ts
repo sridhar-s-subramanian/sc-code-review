@@ -1,7 +1,7 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type ToolName = "semgrep" | "bearer" | "trivy";
 export type OutputFormat = "html" | "json" | "both";
-export type AiProvider = "anthropic"; // extend later: "openai" | "gemini"
+export type AiProvider = "anthropic" | "openai" | "google";
 
 export interface Finding {
   tool: ToolName;
@@ -46,7 +46,7 @@ export interface Report {
 export interface Config {
   provider: AiProvider;
   model: string;
-  anthropicApiKey: string;
+  apiKey: string;
   tools: {
     semgrep: boolean;
     bearer: boolean;

@@ -4,7 +4,7 @@ import { stat } from "node:fs/promises";
 import { runInit } from "./init.ts";
 import { loadConfig, configExists } from "./config.ts";
 import { runAllScanners } from "./scanner/index.ts";
-import { analyzeWithClaude } from "./analyzer.ts";
+import { analyze } from "./analyzer.ts";
 import { writeHtmlReport } from "./reporter/html.ts";
 import {
   printProgress, printSuccess, printError,
@@ -75,7 +75,7 @@ async function cmdScan(args: string[]): Promise<void> {
 
   let analysis;
   try {
-    analysis = await analyzeWithClaude(scan, config.anthropicApiKey, config.model, printAnalysisChunk);
+    analysis = await analyze(scan, config, printAnalysisChunk);
   } catch (err) {
     printError(`\nAI analysis failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);

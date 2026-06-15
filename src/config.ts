@@ -19,7 +19,12 @@ export async function loadConfig(): Promise<Config> {
   if (!(await file.exists())) {
     throw new Error("Not initialized. Run: bun run cli init");
   }
-  return file.json() as Promise<Config>;
+  const raw = await file.json() as Record<string, unknown>;
+  // Backward compat: migrate old anthropicApiKey field
+  if (!raw["apiKey"] && raw["anthropicApiKey"]) {
+    raw["apiKey"] = raw["anthropicApiKey"];
+  }
+  return raw as unknown as Config;
 }
 
 export async function saveConfig(config: Config): Promise<void> {

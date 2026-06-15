@@ -1,5 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { AiAnalysis, Finding, ScanResult } from "./types.ts";
+import { streamText as streamAnthropic } from "./providers/anthropic.ts";
+import { streamText as streamOpenAI }    from "./providers/openai.ts";
+import { streamText as streamGoogle }    from "./providers/google.ts";
+import type { AiAnalysis, Config, Finding, ScanResult } from "./types.ts";
 
 const SYSTEM_PROMPT = `You are an expert application security engineer. You have received findings from multiple automated SAST tools and must synthesize them into a concise, actionable security report.
 
@@ -63,8 +65,8 @@ function parseResponse(markdown: string): AiAnalysis {
     riskScore >= 5 ? "Medium" : "Low";
 
   const sections = markdown.split(/^##\s+/m);
-  const criticalSection = sections.find((s) => s.startsWith("Critical Issues")) ?? "";
-  const patternsSection = sections.find((s) => s.startsWith("Cross-Tool")) ?? "";
+  const criticalSection    = sections.find((s) => s.startsWith("Critical Issues")) ?? "";
+  const patternsSection    = sections.find((s) => s.startsWith("Cross-Tool")) ?? "";
   const remediationSection = sections.find((s) => s.startsWith("Prioritized")) ?? "";
 
   const remediationPlan = [...remediationSection.matchAll(/^\d+\.\s+(.+)$/gm)]
@@ -74,42 +76,27 @@ function parseResponse(markdown: string): AiAnalysis {
   return {
     riskScore,
     riskLabel,
-    criticalSummary: criticalSection.replace(/^Critical Issues Summary\s*/i, "").trim(),
+    criticalSummary:   criticalSection.replace(/^Critical Issues Summary\s*/i, "").trim(),
     crossToolPatterns: patternsSection.replace(/^Cross-Tool Pattern Analysis\s*/i, "").trim(),
     remediationPlan,
     rawMarkdown: markdown,
   };
 }
 
-function supportsThinking(model: string): boolean {
-  return model.includes("opus") || model.includes("sonnet");
-}
-
-export async function analyzeWithClaude(
+export async function analyze(
   scan: ScanResult,
-  apiKey: string,
-  model: string,
+  config: Config,
   onChunk: (text: string) => void,
 ): Promise<AiAnalysis> {
-  const client = new Anthropic({ apiKey });
-  let fullText = "";
+  const userPrompt = buildPrompt(scan);
+  let fullText: string;
 
-  const stream = client.messages.stream({
-    model,
-    max_tokens: 4096,
-    ...(supportsThinking(model) ? { thinking: { type: "adaptive" } } : {}),
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildPrompt(scan) }],
-  });
-
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      fullText += event.delta.text;
-      onChunk(event.delta.text);
-    }
+  if (config.provider === "anthropic") {
+    fullText = await streamAnthropic(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
+  } else if (config.provider === "openai") {
+    fullText = await streamOpenAI(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
+  } else {
+    fullText = await streamGoogle(config.apiKey, config.model, SYSTEM_PROMPT, userPrompt, onChunk);
   }
 
   return parseResponse(fullText);
